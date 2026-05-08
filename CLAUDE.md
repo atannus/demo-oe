@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Infrastructure
 
-Start Postgres and Redis before running any service:
+Start Postgres, Redis, and MongoDB (as a single-node replica set) before running any service:
 ```bash
 docker compose up -d
 ```
-Credentials: user `app`, password `app`, database `app`, all on localhost defaults.
+PostgreSQL credentials: user `app`, password `app`, database `app`, all on localhost defaults.
+MongoDB: unauthenticated, `mongodb://localhost:27017/app?replicaSet=rs0`. The `mongo-init` container runs `rs.initiate()` automatically on first start.
 
 ## Development
 
@@ -51,20 +52,21 @@ pnpm --filter frontend lint    # eslint
 
 ## Architecture
 
-This is a polyglot monorepo (pnpm workspaces) demonstrating real-time synchronization across two independent backends that share a PostgreSQL database and a Redis pub/sub channel.
+This is a polyglot monorepo (pnpm workspaces) demonstrating real-time synchronization across two independent backends that each own a separate database and replicate via Redis pub/sub.
 
 ```
 Frontend (React/Vite :5173)
-  ├── REST PATCH + WebSocket ──► NestJS (:3001)
-  └── REST PATCH + WebSocket ──► FastAPI (:8000)
+  ├── REST PATCH + WebSocket ──► NestJS (:3001)  [MongoDB: positions + outbox]
+  └── REST PATCH + WebSocket ──► FastAPI (:8000) [PostgreSQL: positions + outbox]
                                     │
-                          PostgreSQL + Redis pub/sub
-                          (both backends read/write)
+                          Redis (replication events via outbox relay)
 ```
 
-**Shared state:** a single `positions` table row (`data_id = "1"`). Either backend can upsert it. After a write, the writer publishes to the Redis channel `position:updated`. Each backend has a separate Redis subscriber that forwards incoming messages over WebSocket to all connected frontend clients.
+**Separate storage per node:** NestJS uses MongoDB (`positions` collection); FastAPI uses PostgreSQL (`positions` table). Each backend only ever touches its own storage. `data_id` is an internal constant (`"1"`); it is not exposed as a URL parameter.
 
-**Position endpoints:** `GET /position` and `PATCH /position` on both backends. `data_id` is an internal constant (`"1"`); it is not exposed as a URL parameter.
+**Outbox pattern:** every write atomically inserts both a position record and an outbox record in the same DB transaction. A relay process reads the outbox and publishes to the Redis channel `position:replicated`. NestJS uses a MongoDB change stream relay (CDC, push-based); FastAPI uses a polling relay (100ms interval). This guarantees at-least-once delivery even if the process crashes between the DB write and the publish.
+
+**Replication loop prevention:** each backend's subscriber ignores events where `source` matches itself (`'ts'` for NestJS, `'py'` for FastAPI). `applyReplication()` writes the position but does not insert to the outbox.
 
 **NestJS WS:** `PositionGateway` is a plain `@Injectable()` (not a `@WebSocketGateway`) that owns a `ws.Server({ noServer: true })`. `main.ts` wires it to the HTTP server's `upgrade` event at path `/ws`. This avoids the `WsAdapter` abstraction.
 
@@ -102,13 +104,15 @@ After changing code, rebuild the image and rollout restart the affected deployme
 - `k8s/namespace.yaml` — `edu-oe` namespace
 - `k8s/postgres.yaml` — Secret + PVC (1Gi) + Deployment + ClusterIP :5432
 - `k8s/redis.yaml` — Deployment + ClusterIP :6379
-- `k8s/backend-ts.yaml` — ConfigMap + Deployment + LoadBalancer :3001
+- `k8s/mongo.yaml` — PVC (2Gi) + StatefulSet (single-node replica set `rs0`) + headless Service :27017
+- `k8s/mongo-init-job.yaml` — one-shot Job that runs `rs.initiate()` after the StatefulSet is ready
+- `k8s/backend-ts.yaml` — ConfigMap (`MONGODB_URI`, Redis config) + Deployment + LoadBalancer :3001
 - `k8s/backend-py.yaml` — ConfigMap + Deployment + LoadBalancer :8000
 - `k8s/frontend.yaml` — Deployment + LoadBalancer :80
 - `k8s/monitoring.yaml` — ServiceMonitor x2 (scrapes `/metrics` on both backends every 15s)
 - `k8s/grafana-dashboard.yaml` — ConfigMap auto-imported by Grafana sidecar; label `grafana_dashboard: "1"`
 
-DB credentials flow: `postgres-secret` holds `POSTGRES_USER/PASSWORD/DB`; backend deployments pull `DB_USER`/`DB_PASSWORD` from that secret and remaining config (hosts, ports) from their ConfigMap.
+Credentials: `postgres-secret` holds `POSTGRES_USER/PASSWORD/DB`; FastAPI's backend deployment pulls from that secret. NestJS connects to MongoDB without credentials (`MONGODB_URI` in its ConfigMap). The replica set member host in the K8s URI must be the StatefulSet pod FQDN (`mongo-0.mongo.edu-oe.svc.cluster.local:27017`), not `localhost`, so the driver resolves it correctly from within the cluster.
 
 ## Observability (Prometheus + Grafana + Loki)
 
@@ -138,10 +142,16 @@ Helm values live in `k8s/helm/`.
 - Use `grafana/alloy` (not the deprecated `grafana/promtail`) for log collection. Alloy is the successor to Promtail and Grafana Agent. Config is in River/Alloy syntax inside `alloy.configMap.content` in `k8s/helm/alloy-values.yaml`.
 
 ## Key files
-- `apps/backend-ts/src/position/` — NestJS entity, service, controller, gateway, module
-- `apps/backend-ts/src/app.module.ts` — TypeORM + ConfigModule setup
+- `apps/backend-ts/src/position/position.schema.ts` — Mongoose Position schema (`positions` collection)
+- `apps/backend-ts/src/position/outbox.schema.ts` — Mongoose Outbox schema (`outbox` collection)
+- `apps/backend-ts/src/position/position.service.ts` — upsert via MongoDB session transaction (position + outbox atomic write)
+- `apps/backend-ts/src/position/outbox-relay.service.ts` — change stream relay: watches `outbox` collection, publishes to Redis, deletes on success; catch-up scan on startup
+- `apps/backend-ts/src/position/position.gateway.ts` — WS broadcast + Redis subscriber (replication sink); handles partition state transitions
+- `apps/backend-ts/src/app.module.ts` — MongooseModule + ConfigModule setup
 - `apps/backend-ts/src/redis.provider.ts` — shared ioredis client token `REDIS_CLIENT`
 - `apps/backend-ts/src/metrics/` — MetricsService (Registry + counters/gauges), middleware, controller, global module
-- `apps/backend-py/main.py` — entire FastAPI service (single file)
-- `apps/frontend/src/App.tsx` — entire frontend (single file)
+- `apps/backend-py/main.py` — entire FastAPI service (single file): models, outbox_publisher polling relay, redis_subscriber, all endpoints
+- `apps/frontend/src/App.tsx` — frontend shell (routing, theme, layout)
+- `apps/frontend/src/components/PositionBox.tsx` — draggable marker component; REST write + WS receive
+- `apps/frontend/src/context/PartitionContext.tsx` — partition state machine; heal logic; auto-heal on Redis reconnect
 - `k8s/helm/` — Helm values for kube-prometheus-stack, loki, and alloy

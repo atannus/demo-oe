@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Gauge
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-from sqlalchemy import Column, Float, String, DateTime, text
+from sqlalchemy import Column, Float, Integer, String, DateTime, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -47,11 +47,21 @@ Base = declarative_base()
 
 
 class PositionRow(Base):
-    __tablename__ = "positions_py"
+    __tablename__ = "positions"
     data_id = Column(String, primary_key=True)
     x = Column(Float, nullable=False)
     y = Column(Float, nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class OutboxRow(Base):
+    __tablename__ = "outbox"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    data_id = Column(String, nullable=False)
+    x = Column(Float, nullable=False)
+    y = Column(Float, nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
 
 
 # Connected WebSocket clients
@@ -93,7 +103,7 @@ async def apply_replication(x: float, y: float, updated_at_str: str) -> None:
         await session.execute(
             text(
                 """
-                INSERT INTO positions_py (data_id, x, y, updated_at)
+                INSERT INTO positions (data_id, x, y, updated_at)
                 VALUES (:data_id, :x, :y, :updated_at)
                 ON CONFLICT (data_id) DO UPDATE
                 SET x = EXCLUDED.x, y = EXCLUDED.y, updated_at = EXCLUDED.updated_at
@@ -153,13 +163,62 @@ async def redis_subscriber():
                     pass
 
 
+OUTBOX_POLL_INTERVAL = 0.1  # 100ms
+
+
+async def outbox_publisher():
+    while True:
+        await asyncio.sleep(OUTBOX_POLL_INTERVAL)
+        if partition_active:
+            # Partition is active: drop accumulated outbox rows.
+            # Simulated partitions resolve via the Heal button; infrastructure partitions
+            # (Redis down) set partition_active=True via redis_subscriber, so this path
+            # also covers that case. Writes to the local DB are preserved either way.
+            async with AsyncSessionLocal() as session:
+                await session.execute(text("DELETE FROM outbox"))
+                await session.commit()
+            continue
+        if not redis_connected:
+            continue
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    text("SELECT id, x, y, updated_at FROM outbox ORDER BY id LIMIT 100")
+                )
+                rows = result.fetchall()
+
+            for row in rows:
+                try:
+                    r = aioredis.Redis(host=REDIS_HOST, port=REDIS_PORT, socket_connect_timeout=1)
+                    payload = {
+                        "source": "py",
+                        "x": row.x,
+                        "y": row.y,
+                        "updated_at": row.updated_at.isoformat(),
+                    }
+                    await r.publish(REPLICATION_CHANNEL, json.dumps(payload))
+                    redis_messages_published_total.inc()
+                    await r.aclose()
+                    async with AsyncSessionLocal() as del_session:
+                        await del_session.execute(
+                            text("DELETE FROM outbox WHERE id = :id"), {"id": row.id}
+                        )
+                        await del_session.commit()
+                except Exception:
+                    break  # Redis failed — leave row, retry next cycle
+        except Exception:
+            pass  # DB error — retry next cycle
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    task = asyncio.create_task(redis_subscriber())
+    sub_task = asyncio.create_task(redis_subscriber())
+    pub_task = asyncio.create_task(outbox_publisher())
     yield
-    task.cancel()
+    sub_task.cancel()
+    pub_task.cancel()
 
 
 app = FastAPI(title="backend-py", lifespan=lifespan)
@@ -251,29 +310,31 @@ async def update_position(body: PositionBody):
         raise HTTPException(status_code=503, detail="Partition active: CP mode rejects writes")
     now = datetime.now(timezone.utc)
     async with AsyncSessionLocal() as session:
-        await session.execute(
-            text(
-                """
-                INSERT INTO positions_py (data_id, x, y, updated_at)
-                VALUES (:data_id, :x, :y, :updated_at)
-                ON CONFLICT (data_id) DO UPDATE
-                SET x = EXCLUDED.x, y = EXCLUDED.y, updated_at = EXCLUDED.updated_at
-                """
-            ),
-            {"data_id": DATA_ID, "x": body.x, "y": body.y, "updated_at": now},
-        )
-        await session.commit()
+        async with session.begin():
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO positions (data_id, x, y, updated_at)
+                    VALUES (:data_id, :x, :y, :updated_at)
+                    ON CONFLICT (data_id) DO UPDATE
+                    SET x = EXCLUDED.x, y = EXCLUDED.y, updated_at = EXCLUDED.updated_at
+                    """
+                ),
+                {"data_id": DATA_ID, "x": body.x, "y": body.y, "updated_at": now},
+            )
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO outbox (data_id, x, y, updated_at, created_at)
+                    VALUES (:data_id, :x, :y, :updated_at, :created_at)
+                    """
+                ),
+                {"data_id": DATA_ID, "x": body.x, "y": body.y, "updated_at": now, "created_at": now},
+            )
+            # session.begin() auto-commits on __aexit__
 
     payload = {"x": body.x, "y": body.y, "updated_at": now.isoformat()}
     await broadcast(payload)
-    if not partition_active:
-        try:
-            r = aioredis.Redis(host=REDIS_HOST, port=REDIS_PORT, socket_connect_timeout=1)
-            await r.publish(REPLICATION_CHANNEL, json.dumps({"source": "py", **payload}))
-            redis_messages_published_total.inc()
-            await r.aclose()
-        except Exception:
-            pass
     return payload
 
 

@@ -1,0 +1,100 @@
+<svg viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sequence diagram: outbox write flow">
+  <title>Outbox Write Flow</title>
+  <style>#bg{fill:#2e2e2e}.b{fill:#343434}.tp{fill:#e8e8e8}@media(prefers-color-scheme:light){#bg{fill:#f0f0f0}.b{fill:#f8f8f8}.tp{fill:#111111}}</style>
+  <defs>
+    <marker id="ob-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M0,1 L9,5 L0,9 Z" fill="#a0a0a0"/>
+    </marker>
+    <marker id="ob-ah-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M0,1 L9,5 L0,9 Z" fill="#3db845" fill-opacity="0.85"/>
+    </marker>
+    <marker id="ob-ah-mo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <path d="M0,1 L9,5 L0,9 Z" fill="#47A248" fill-opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <rect id="bg" width="640" height="420" fill="#2e2e2e"/>
+
+  <!-- ── Participant boxes ── -->
+  <!-- Lane x-centers: Frontend=55, NestJS=175, Mongo=305, OutboxRelay=435, Redis=565 -->
+
+  <!-- Frontend -->
+  <rect x="10"  y="32" width="90" height="26" rx="3" class="b" fill="#343434" stroke="#4c4c4c"/>
+  <text x="55"  y="49" text-anchor="middle" class="tp" fill="#e8e8e8" font-family="system-ui,sans-serif" font-size="11">Frontend</text>
+
+  <!-- NestJS -->
+  <rect x="130" y="32" width="90" height="26" rx="3" class="b" fill="#343434" stroke="#3178c6" stroke-opacity="0.6"/>
+  <text x="175" y="49" text-anchor="middle" fill="#3178c6" font-family="ui-monospace,Consolas,monospace" font-size="10" font-weight="500">NestJS</text>
+
+  <!-- Mongo -->
+  <rect x="260" y="32" width="90" height="26" rx="3" class="b" fill="#343434" stroke="#47A248" stroke-opacity="0.6"/>
+  <text x="305" y="49" text-anchor="middle" fill="#47A248" font-family="ui-monospace,Consolas,monospace" font-size="10">Mongo</text>
+
+  <!-- OutboxRelay (runs inside NestJS process) -->
+  <rect x="388" y="32" width="94" height="26" rx="3" class="b" fill="#343434" stroke="#3178c6" stroke-opacity="0.35"/>
+  <text x="435" y="46" text-anchor="middle" fill="#3178c6" fill-opacity="0.7" font-family="ui-monospace,Consolas,monospace" font-size="10">OutboxRelay</text>
+  <text x="435" y="57" text-anchor="middle" fill="#3178c6" fill-opacity="0.35" font-family="system-ui,sans-serif" font-size="8">inside NestJS</text>
+
+  <!-- Redis -->
+  <rect x="525" y="32" width="80" height="26" rx="3" class="b" fill="#343434" stroke="#646464"/>
+  <text x="565" y="49" text-anchor="middle" fill="#848484" font-family="ui-monospace,Consolas,monospace" font-size="10">Redis</text>
+
+  <!-- ── Lifelines ── -->
+  <line x1="55"  y1="58" x2="55"  y2="390" stroke="#3c3c3c" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="175" y1="58" x2="175" y2="390" stroke="#3c3c3c" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="305" y1="58" x2="305" y2="390" stroke="#3c3c3c" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="435" y1="58" x2="435" y2="390" stroke="#3c3c3c" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="565" y1="58" x2="565" y2="390" stroke="#3c3c3c" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- ── Sync region (steps 1–3) ── -->
+  <rect x="0" y="84" width="610" height="116" rx="2" fill="#3db845" fill-opacity="0.03" stroke="#3db845" stroke-opacity="0.08" stroke-width="1"/>
+  <text x="617" y="132" fill="#3db845" fill-opacity="0.5" font-family="system-ui,sans-serif" font-size="9" writing-mode="vertical-rl">sync</text>
+
+  <!-- ── Async region (steps 4–6) ── -->
+  <rect x="0" y="212" width="610" height="166" rx="2" fill="#3178c6" fill-opacity="0.03" stroke="#3178c6" stroke-opacity="0.06" stroke-width="1"/>
+  <text x="617" y="288" fill="#3178c6" fill-opacity="0.4" font-family="system-ui,sans-serif" font-size="9" writing-mode="vertical-rl">async</text>
+
+  <!-- ── Atomic transaction bracket (surrounds step 2) ── -->
+  <rect x="166" y="118" width="148" height="36" rx="2" fill="#47A248" fill-opacity="0.04" stroke="#47A248" stroke-opacity="0.2" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="239" y="115" text-anchor="middle" fill="#47A248" fill-opacity="0.5" font-family="system-ui,sans-serif" font-size="8">atomic transaction</text>
+
+  <!-- ── Step 1: Frontend → NestJS: PATCH /position ── -->
+  <line x1="57" y1="100" x2="171" y2="100" stroke="#a0a0a0" stroke-opacity="0.7" stroke-width="1.5" marker-end="url(#ob-ah)"/>
+  <text x="114" y="95" text-anchor="middle" fill="#a0a0a0" fill-opacity="0.7" font-family="system-ui,sans-serif" font-size="10">PATCH /position {x, y}</text>
+
+  <!-- ── Step 2: NestJS → Mongo: upsert positions + insert outbox (atomic) ── -->
+  <line x1="177" y1="134" x2="256" y2="134" stroke="#47A248" stroke-opacity="0.6" stroke-width="1.5" marker-end="url(#ob-ah-mo)"/>
+  <text x="216" y="129" text-anchor="middle" fill="#47A248" fill-opacity="0.7" font-family="system-ui,sans-serif" font-size="9">upsert positions</text>
+  <text x="216" y="145" text-anchor="middle" fill="#47A248" fill-opacity="0.45" font-family="system-ui,sans-serif" font-size="9">+ insert outbox</text>
+
+  <!-- ── Step 3: NestJS → Frontend: WS broadcast ── -->
+  <line x1="173" y1="172" x2="59" y2="172" stroke="#3db845" stroke-opacity="0.8" stroke-width="1.5" marker-end="url(#ob-ah-g)"/>
+  <text x="114" y="167" text-anchor="middle" fill="#3db845" fill-opacity="0.8" font-family="system-ui,sans-serif" font-size="10">WS broadcast</text>
+  <text x="114" y="184" text-anchor="middle" fill="#3db845" fill-opacity="0.45" font-family="system-ui,sans-serif" font-size="9">no Redis round-trip</text>
+
+  <!-- ── Step 4: Mongo → OutboxRelay: change stream event ── -->
+  <line x1="307" y1="236" x2="431" y2="236" stroke="#a0a0a0" stroke-opacity="0.6" stroke-width="1.5" marker-end="url(#ob-ah)"/>
+  <text x="369" y="229" text-anchor="middle" fill="#a0a0a0" fill-opacity="0.6" font-family="system-ui,sans-serif" font-size="10">change stream: insert event</text>
+  <text x="369" y="248" text-anchor="middle" fill="#a0a0a0" fill-opacity="0.35" font-family="system-ui,sans-serif" font-size="9">push-based · CDC</text>
+
+  <!-- ── Step 5: OutboxRelay → Redis: PUBLISH ── -->
+  <line x1="437" y1="276" x2="561" y2="276" stroke="#a0a0a0" stroke-opacity="0.6" stroke-width="1.5" marker-end="url(#ob-ah)"/>
+  <text x="499" y="271" text-anchor="middle" fill="#a0a0a0" fill-opacity="0.6" font-family="system-ui,sans-serif" font-size="10">PUBLISH position:replicated</text>
+
+  <!-- ── Step 6: OutboxRelay → Mongo: delete outbox doc ── -->
+  <line x1="433" y1="316" x2="309" y2="316" stroke="#47A248" stroke-opacity="0.5" stroke-width="1.5" marker-end="url(#ob-ah-mo)"/>
+  <text x="369" y="311" text-anchor="middle" fill="#47A248" fill-opacity="0.55" font-family="system-ui,sans-serif" font-size="10">delete outbox doc</text>
+  <text x="369" y="328" text-anchor="middle" fill="#47A248" fill-opacity="0.3" font-family="system-ui,sans-serif" font-size="9">on confirmed publish only</text>
+
+  <!-- ── Crash recovery note ── -->
+  <rect x="130" y="352" width="350" height="26" rx="3" fill="#3c3c3c" fill-opacity="0.5"/>
+  <text x="305" y="369" text-anchor="middle" fill="#646464" font-family="system-ui,sans-serif" font-size="9">on startup: relay scans Mongo for leftover docs before opening stream</text>
+
+  <!-- Step numbers -->
+  <text x="8" y="103" fill="#4c4c4c" font-family="ui-monospace,Consolas,monospace" font-size="9">1</text>
+  <text x="8" y="137" fill="#4c4c4c" font-family="ui-monospace,Consolas,monospace" font-size="9">2</text>
+  <text x="8" y="175" fill="#4c4c4c" font-family="ui-monospace,Consolas,monospace" font-size="9">3</text>
+  <text x="8" y="239" fill="#4c4c4c" font-family="ui-monospace,Consolas,monospace" font-size="9">4</text>
+  <text x="8" y="279" fill="#4c4c4c" font-family="ui-monospace,Consolas,monospace" font-size="9">5</text>
+  <text x="8" y="319" fill="#4c4c4c" font-family="ui-monospace,Consolas,monospace" font-size="9">6</text>
+</svg>

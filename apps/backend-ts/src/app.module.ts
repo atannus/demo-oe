@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Position } from './position/position.entity';
+import { MongooseModule } from '@nestjs/mongoose';
 import { PositionModule } from './position/position.module';
 import { RedisProvider } from './redis.provider';
 import { MetricsModule } from './metrics/metrics.module';
@@ -10,17 +9,10 @@ import { MetricsModule } from './metrics/metrics.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     MetricsModule,
-    TypeOrmModule.forRootAsync({
+    MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST'),
-        port: config.get<number>('DB_PORT'),
-        username: config.get<string>('DB_USER'),
-        password: config.get<string>('DB_PASSWORD'),
-        database: config.get<string>('DB_NAME'),
-        entities: [Position],
-        synchronize: true,
+        uri: config.get<string>('MONGODB_URI'),
       }),
     }),
     PositionModule,

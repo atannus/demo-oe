@@ -25,12 +25,12 @@ Because real networks do fail, P is not optional in practice. The real choice is
 
 The system is designed as a **symmetric multi-leader** cluster:
 
-- **NestJS** is one node. It owns table `positions_ts`.
-- **FastAPI** is another node. It owns table `positions_py`.
-- Neither backend ever reads from or writes to the other's table directly.
-- **Redis** carries **replication events** between the two nodes. When a backend writes to its own table, it publishes a replication event `{ source, x, y, updated_at }` to the `position:replicated` channel. The other backend's subscriber receives this event, applies the value to its own table, and notifies its own WebSocket clients.
+- **NestJS** is one node. It owns a MongoDB database (`positions` collection).
+- **FastAPI** is another node. It owns a PostgreSQL table (`positions`).
+- Neither backend ever reads from or writes to the other's storage directly.
+- **Redis** carries **replication events** between the two nodes via a durable outbox relay. When a backend writes to its own storage, it also inserts an outbox record in the same atomic transaction; a separate relay process reads the outbox and publishes `{ source, x, y, updated_at }` to the `position:replicated` channel. The other backend's subscriber receives this event, applies the value to its own storage, and notifies its own WebSocket clients.
 
-The shared PostgreSQL instance is the physical host for both tables but is not part of the distributed system's identity. In a real deployment these tables would live on separate servers; the demo runs them on one server for simplicity. Each backend enforces the logical boundary by only ever touching its own table.
+The two backends use different databases intentionally: NestJS uses MongoDB and FastAPI uses PostgreSQL. This choice serves two purposes. First, it makes the boundary between nodes concrete and visible — each node's storage is structurally distinct, not just logically partitioned. Second, it allows the outbox relay strategies to differ across the two nodes, demonstrating the same pattern with different underlying mechanics (see below). The demo models two independent nodes that in a real deployment would live on separate servers, potentially in different geographies. Each container has its own process, network, and storage namespaces, which is the isolation that matters for demonstrating replication and CAP behavior. The only meaningful simplification is that both containers share a hardware failure domain: if the host goes down, both go down together. A real deployment would distribute them across independent infrastructure.
 
 This is a real-world pattern. Systems like Apache Cassandra, DynamoDB Global Tables, and CockroachDB use multi-leader (or "multi-master") replication: writes are accepted at any node and replicated asynchronously to peers. The CAP tradeoff appears naturally when replication fails.
 
@@ -49,6 +49,49 @@ The writing backend commits to its own table and broadcasts to its own WebSocket
 ![Write Sequence](docs/diagrams/sequence-write-normal.svg)
 
 The replication event payload includes a `source` field (`'ts'` or `'py'`). Each backend discards events where `source` matches itself, preventing a replication loop: NestJS publishes with `source: 'ts'`; FastAPI's subscriber ignores events with `source: 'py'`; and vice versa.
+
+## The outbox pattern
+
+### The problem it solves
+
+The original implementation published to Redis directly after writing to the database. These two operations were independent: if the process crashed, or Redis was momentarily unreachable, between the successful database write and the publish call, the event was silently lost. The other backend never received it, and the divergence was permanent until a user-initiated heal.
+
+### How it works
+
+Each backend now performs an **atomic write** on every position update:
+
+1. Write the new position to its own storage.
+2. Insert an outbox record containing the same payload (`x`, `y`, `updated_at`) into an outbox table or collection **in the same database transaction**.
+3. Return success to the caller.
+
+A separate **relay process** runs independently of the write path. It reads outbox records and publishes them to Redis. Only after a confirmed publish does it delete the record. If the relay fails mid-cycle — because Redis is down, because the process crashes, or for any other reason — the record remains in the outbox and will be retried on the next cycle or on restart. This gives at-least-once delivery for the relay step.
+
+Because the position write and the outbox insert are in the same transaction, they either both succeed or both fail. There is no window where the position is written but no outbox record exists to trigger replication.
+
+### Two relay strategies, one pattern
+
+The two backends implement the outbox relay differently, demonstrating that the same guarantee can be achieved with different underlying mechanics:
+
+**FastAPI / PostgreSQL — polling relay**
+
+A background coroutine (`outbox_publisher`) wakes every 100 milliseconds, queries `outbox` for the oldest undelivered rows, publishes each to Redis, and deletes the row on confirmation. This is the simplest relay strategy: it requires no database-specific features, works identically on any relational database, and is straightforward to reason about. The tradeoff is a bounded delivery latency equal to the poll interval.
+
+**NestJS / MongoDB — change stream relay**
+
+A NestJS service (`OutboxRelayService`) opens a MongoDB **change stream** on the `outbox` collection filtered to insert operations. MongoDB delivers each new outbox document to the relay as it is inserted, rather than the relay polling for it. The relay publishes to Redis and deletes the document on confirmation. This is MongoDB's native CDC (change data capture) primitive: the database pushes events rather than the relay pulling them. Delivery latency is near-zero. The tradeoff is that it requires a MongoDB replica set (even a single-node one) and a persistent stream connection.
+
+On startup, the relay performs a **catch-up scan** before opening the stream: it queries the outbox collection for any documents left from before the process started (from a previous crash mid-relay) and processes them first. The stream is opened before the scan to avoid a gap between the two phases.
+
+![Outbox Write Flow](docs/diagrams/outbox-write-flow.svg)
+
+### Outbox behavior during partitions
+
+When `partition_active` is true — either because the user triggered a simulated partition or because Redis went down and the auto-partition mode activated — the relay drops outbox records rather than buffering them. This is intentional:
+
+- For **simulated partitions**, the divergence is deliberate. Buffering and auto-delivering writes made during the partition would short-circuit the Heal button flow, which is the educational centerpiece of the demo. Writes during a simulated AP partition are not retroactively replicated; the user resolves the divergence manually via the chosen heuristic.
+- For **infrastructure partitions** (Redis down), the behavior is the same: writes land on the local database and are not replicated after heal. The outbox's contribution in this case is narrower than in the process-crash scenario — it ensures that any outbox records that *were* written before the partition activated are not lost, but new records written during the partition are dropped once the relay clears them.
+
+The outbox pattern's primary value here is for the failure scenario it was designed for: the window between a successful database write and a successful Redis publish when both systems are available. In that window, a process crash or transient Redis error no longer silently loses the replication event.
 
 ## Partition simulation
 
@@ -119,6 +162,7 @@ Each backend also exposes a `GET /admin/status` endpoint that reports the curren
 This is a simulation, not a production distributed system. Some limitations worth being aware of:
 
 - **No clock synchronization**: LWW depends on `updated_at` timestamps generated by each backend's local clock. In this single-machine setup, clocks are identical. In a real multi-region deployment, clock skew would be a real concern (addressed by systems like Google Spanner using TrueTime).
-- **No actual network partition** in the simulated mode: the partition is an application-layer flag, not a real network split. Both backends can always reach the same Redis and Postgres server. The infrastructure partition mode uses a real Redis outage but still shares a single Postgres instance.
+- **No actual network partition** in the simulated mode: the partition is an application-layer flag, not a real network split. Both backends can always reach Redis and their own databases (MongoDB for NestJS, PostgreSQL for FastAPI). The infrastructure partition mode uses a real Redis outage, but each backend retains full access to its own database throughout.
 - **No quorum**: CP systems like ZooKeeper, etcd, and Raft-based systems use quorum reads and writes to distinguish majority and minority partitions. This demo does not implement quorum; CP mode simply rejects all writes unconditionally, which is correct for a two-node cluster where no quorum majority is possible.
-- **No durability during partition in AP mode**: writes during an AP partition go to each backend's own table, which is durable in the PostgreSQL sense, but the *other backend's* table is stale. Reconciliation on heal may overwrite writes made by the losing backend. This is expected and is part of what AP mode means.
+- **No cross-node durability during partition in AP mode**: writes during an AP partition go to each backend's own storage (durable locally), but the other backend's storage is stale. Reconciliation on heal may overwrite writes made by the losing backend. This is expected and is part of what AP mode means. The outbox pattern does not change this: outbox records are dropped when partition is active, so writes during a partition are not retroactively replicated after healing (the Heal button handles that explicitly).
+- **At-least-once, not exactly-once**: the outbox relay delivers replication events at least once. Because the position upsert is idempotent (same `x, y` applied twice is harmless), duplicate delivery is benign in practice, but a production system would additionally deduplicate on the subscriber side.

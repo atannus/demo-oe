@@ -4,8 +4,8 @@ export function AboutPage() {
       <div className="about-hero">
         <h1 className="about-title">An Interactive CAP Theorem Demo</h1>
         <p className="about-lead">
-          Two independent backends, NestJS (TypeScript) and FastAPI (Python), each own their own
-          database table and replicate state through Redis pub/sub. You can trigger network partitions,
+          Two independent backends — NestJS (TypeScript) owns a MongoDB collection and FastAPI (Python)
+          owns a PostgreSQL table — replicate state through Redis pub/sub. You can trigger network partitions,
           watch the backends diverge or freeze depending on the consistency model, then heal the partition
           and observe reconciliation in real time.
         </p>
@@ -28,7 +28,7 @@ export function AboutPage() {
           <div className="about-card about-card-normal">
             <div className="about-card-badge">Normal</div>
             <p>Both backends accept writes. Each write is applied locally, broadcast over WebSocket immediately,
-            then published to Redis. The other backend subscribes, applies the value to its own table,
+            then published to Redis via the outbox relay (at-least-once delivery). The other backend subscribes, applies the value to its own storage,
             and broadcasts to its clients.</p>
           </div>
           <div className="about-card about-card-ap">
@@ -77,7 +77,7 @@ export function AboutPage() {
             View source on GitHub →
           </a>
         </div>
-        <p className="about-stack">React · NestJS · FastAPI · PostgreSQL · Redis</p>
+        <p className="about-stack">React · NestJS · FastAPI · MongoDB · PostgreSQL · Redis</p>
       </section>
     </div>
   )

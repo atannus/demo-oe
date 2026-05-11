@@ -1,16 +1,15 @@
 # interactive-cap-demo
 
-A polyglot monorepo for CAP theorem experiments. Two independent backends (NestJS + FastAPI) act as symmetric multi-leader nodes, each owning their own PostgreSQL table and staying in sync via Redis replication events. A React frontend shows each backend's live view of the shared state, lets you trigger AP or CP partitions, and walks you through reconciliation when the partition heals.
+A polyglot monorepo for CAP theorem experiments. Two independent backends (NestJS + FastAPI) act as symmetric multi-leader nodes, each owning their own database and staying in sync via Redis replication events. A React frontend shows each backend's live view of the shared state, lets you trigger AP or CP partitions, and walks you through reconciliation when the partition heals.
 
-For the design rationale (why multi-leader, why separate tables, why the partition model works the way it does), see [ARCHITECTURE.md](./ARCHITECTURE.md).
+For the design rationale (why multi-leader, why separate databases, why the outbox pattern, why the partition model works the way it does), see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ```
 Frontend (React/Vite :5173)
-  ├── REST PATCH + WebSocket ──► NestJS (:3001)  [positions_ts]
-  └── REST PATCH + WebSocket ──► FastAPI (:8000) [positions_py]
+  ├── REST PATCH + WebSocket ──► NestJS (:3001)  [MongoDB: positions + outbox]
+  └── REST PATCH + WebSocket ──► FastAPI (:8000) [PostgreSQL: positions + outbox]
                                     │
-                          PostgreSQL (separate tables per node)
-                          Redis (replication events, not notifications)
+                          Redis (replication events via outbox relay)
 ```
 
 ## Prerequisites
@@ -22,7 +21,7 @@ Frontend (React/Vite :5173)
 
 ## Local development
 
-Start Postgres and Redis, then all three services:
+Start Postgres, Redis, and MongoDB (as a single-node replica set), then all three services:
 
 ```bash
 docker compose up -d

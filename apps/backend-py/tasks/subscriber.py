@@ -7,10 +7,9 @@ from sqlalchemy import text
 
 from config import settings
 from database import AsyncSessionLocal, DATA_ID
-from state import app_state, redis_messages_published_total, redis_messages_received_total
+from state import app_state, redis_messages_received_total
 
 REPLICATION_CHANNEL = "position:replicated"
-OUTBOX_POLL_INTERVAL = 0.1
 
 
 async def apply_replication(x: float, y: float, updated_at_str: str) -> None:
@@ -76,43 +75,3 @@ async def redis_subscriber() -> None:
                     await r.aclose()
                 except Exception:
                     pass
-
-
-async def outbox_publisher() -> None:
-    while True:
-        await asyncio.sleep(OUTBOX_POLL_INTERVAL)
-        if app_state.partition_active:
-            async with AsyncSessionLocal() as session:
-                await session.execute(text("DELETE FROM outbox"))
-                await session.commit()
-            continue
-        if not app_state.redis_connected:
-            continue
-        try:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    text("SELECT id, x, y, updated_at FROM outbox ORDER BY id LIMIT 100")
-                )
-                rows = result.fetchall()
-
-            for row in rows:
-                try:
-                    r = aioredis.Redis(host=settings.redis_host, port=settings.redis_port, socket_connect_timeout=1)
-                    payload = {
-                        "source": "py",
-                        "x": row.x,
-                        "y": row.y,
-                        "updated_at": row.updated_at.isoformat(),
-                    }
-                    await r.publish(REPLICATION_CHANNEL, json.dumps(payload))
-                    redis_messages_published_total.inc()
-                    await r.aclose()
-                    async with AsyncSessionLocal() as del_session:
-                        await del_session.execute(
-                            text("DELETE FROM outbox WHERE id = :id"), {"id": row.id}
-                        )
-                        await del_session.commit()
-                except Exception:
-                    break  # Redis failed — leave row, retry next cycle
-        except Exception:
-            pass  # DB error — retry next cycle

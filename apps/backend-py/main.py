@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from database import Base, engine
-from routes import router
+from routers import router
 from tasks import outbox_publisher, redis_subscriber
 
 logging.getLogger("uvicorn.access").disabled = True

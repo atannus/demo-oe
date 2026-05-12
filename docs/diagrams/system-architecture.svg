@@ -1,0 +1,576 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 639.74292 490"
+   role="img"
+   aria-label="System architecture: Frontend, FastAPI, NestJS, PostgreSQL, Redis, MongoDB, relay nodes"
+   version="1.1"
+   id="svg35"
+   sodipodi:docname="system-architecture.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   width="639.74292"
+   height="490"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview35"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.6205733"
+     inkscape:cx="137.60562"
+     inkscape:cy="189.1306"
+     inkscape:window-width="2560"
+     inkscape:window-height="1376"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg35" />
+  <title
+     id="title1">System Architecture</title>
+  <style
+     id="style1">
+    /* ── Palette ─────────────────────────────────────────────────────── */
+    .bg   { fill: #2e2e2e }
+    .node { fill: #343434 }
+    .dim  { fill: #747474 }
+    @media (prefers-color-scheme: light) {
+      .bg   { fill: #f0f0f0 }
+      .node { fill: #f8f8f8 }
+      .dim  { fill: #888888 }
+    }
+
+    /* ── Node borders by technology ──────────────────────────────────── */
+    .b-fe { stroke: #6c6c6c; stroke-opacity: .55 }
+    .b-ts { stroke: #3178c6; stroke-opacity: .6 }
+    .b-py { stroke: #3d9bd4; stroke-opacity: .6 }
+    .b-mg { stroke: #4db33d; stroke-opacity: .6 }
+    .b-pg { stroke: #336791; stroke-opacity: .6 }
+    .b-rd { stroke: #c82828; stroke-opacity: .6 }
+
+    /* ── Screen widgets ──────────────────────────────────────────────── */
+    .b-screen    { stroke: #7a94b8; stroke-opacity: .72; stroke-width: 1.5 }
+    .grid-line   { stroke: #7a94b8; stroke-opacity: .4; stroke-dasharray: 3 3; stroke-width: 1; fill: none }
+    .marker-ring { fill: none; stroke: #7a94b8; stroke-opacity: .65; stroke-width: 1.5 }
+    .marker-dot  { fill: #7a94b8; fill-opacity: .75 }
+
+    /* ── Typography ──────────────────────────────────────────────────── */
+    .mono  { font-family: ui-monospace, Consolas, monospace; font-size: 10px; font-weight: 500 }
+    .small { font-family: system-ui, sans-serif; font-size: 9px }
+
+    /* ── Brand text colours ──────────────────────────────────────────── */
+    .c-fe { fill: #9c9c9c }
+    .c-ts { fill: #3178c6 }
+    .c-py { fill: #3d9bd4 }
+    .c-mg { fill: #4db33d }
+    .c-pg { fill: #336791 }
+    .c-rd { fill: #c82828 }
+
+    /* ── Edges ───────────────────────────────────────────────────────── */
+    .e       { stroke: #3db845; stroke-opacity: .7; stroke-width: 1.5; fill: none }
+    .e-dash  { stroke-dasharray: 5 3; stroke-opacity: .42 }
+    .e-label { font-family: system-ui, sans-serif; font-size: 9px; fill: #747474; fill-opacity: .9 }
+  </style>
+  <defs
+     id="defs2">
+    <marker
+       id="ah"
+       viewBox="0 0 10 10"
+       refX="9"
+       refY="5"
+       markerWidth="5"
+       markerHeight="5"
+       orient="auto">
+      <path
+         d="M 0,1 9,5 0,9 Z"
+         fill="#3db845"
+         fill-opacity="0.8"
+         id="path1" />
+    </marker>
+    <marker
+       id="ah-d"
+       viewBox="0 0 10 10"
+       refX="9"
+       refY="5"
+       markerWidth="5"
+       markerHeight="5"
+       orient="auto">
+      <path
+         d="M 0,1 9,5 0,9 Z"
+         fill="#3db845"
+         fill-opacity="0.42"
+         id="path2" />
+    </marker>
+  </defs>
+  <rect
+     class="bg"
+     width="639.74292"
+     height="490"
+     id="rect2"
+     x="0"
+     y="0"
+     style="stroke-width:0.816333" />
+  <!-- ══ Frontend container ═══════════════════════════════════════════ -->
+  <rect
+     x="197.0359"
+     y="11.867038"
+     width="224.64703"
+     height="114.75603"
+     rx="1.9534526"
+     class="node b-fe"
+     id="rect3"
+     style="stroke-width:0.734079" />
+  <text
+     x="311.54108"
+     y="28"
+     text-anchor="middle"
+     class="mono c-fe"
+     id="text3">Frontend</text>
+  <text
+     x="311.54108"
+     y="40"
+     text-anchor="middle"
+     class="small dim"
+     id="text4">React / Vite</text>
+  <!-- ── Left screen (FastAPI side): x=385–471, y=48–110 ─────────────── -->
+  <rect
+     x="216.54109"
+     y="48"
+     width="86"
+     height="62"
+     rx="2"
+     class="node b-screen"
+     id="rect4" />
+  <line
+     x1="259.54108"
+     y1="48"
+     x2="259.54108"
+     y2="110"
+     class="grid-line"
+     id="line4" />
+  <line
+     x1="216.54109"
+     y1="79"
+     x2="302.54108"
+     y2="79"
+     class="grid-line"
+     id="line5" />
+  <circle
+     cx="238.54109"
+     cy="63"
+     r="7"
+     class="marker-ring"
+     id="circle5" />
+  <circle
+     cx="238.54109"
+     cy="63"
+     r="2.5"
+     class="marker-dot"
+     id="circle6" />
+  <!-- ── Right screen (NestJS side): x=489–575, y=48–110 ─────────────── -->
+  <rect
+     x="320.54108"
+     y="48"
+     width="86"
+     height="62"
+     rx="2"
+     class="node b-screen"
+     id="rect6" />
+  <line
+     x1="363.54108"
+     y1="48"
+     x2="363.54108"
+     y2="110"
+     class="grid-line"
+     id="line6" />
+  <line
+     x1="320.54108"
+     y1="79"
+     x2="406.54108"
+     y2="79"
+     class="grid-line"
+     id="line7" />
+  <circle
+     cx="342.54108"
+     cy="63"
+     r="7"
+     class="marker-ring"
+     id="circle7" />
+  <circle
+     cx="342.54108"
+     cy="63"
+     r="2.5"
+     class="marker-dot"
+     id="circle8" />
+  <!-- ══ Backends ══════════════════════════════════════════════════════ -->
+  <rect
+     x="30.011139"
+     y="159.91438"
+     width="157.35751"
+     height="44.171249"
+     rx="2.7366524"
+     class="node b-py"
+     id="rect8"
+     style="stroke:#848484;stroke-width:0.828749;stroke-opacity:0.6" />
+  <text
+     x="110.54109"
+     y="177"
+     text-anchor="middle"
+     class="mono c-py"
+     id="text8"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       sodipodi:role="line"
+       id="tspan49"
+       x="110.54109"
+       y="177"
+       style="fill:#888888;fill-opacity:1">FastAPI</tspan></text>
+  <text
+     x="110.54109"
+     y="190"
+     text-anchor="middle"
+     class="small dim"
+     id="text9">Python</text>
+  <rect
+     x="437.71509"
+     y="159.91597"
+     width="158.58846"
+     height="44.168049"
+     rx="2.75806"
+     class="node b-ts"
+     id="rect9"
+     style="stroke:#848484;stroke-width:0.831955;stroke-opacity:0.6" />
+  <text
+     x="514.54108"
+     y="177"
+     text-anchor="middle"
+     class="mono c-ts"
+     id="text10"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       style="fill:#7c7c7c;fill-opacity:1"
+       id="tspan40">NestJS</tspan></text>
+  <text
+     x="514.54108"
+     y="190"
+     text-anchor="middle"
+     class="small dim"
+     id="text11">TypeScript</text>
+  <!-- ══ Storage + Redis ═══════════════════════════════════════════════ -->
+  <rect
+     x="31.85849"
+     y="279.91052"
+     width="154.89694"
+     height="50.04916"
+     rx="2.6938601"
+     class="node b-pg"
+     id="rect11"
+     style="stroke:#848484;stroke-width:0.821053;stroke-opacity:0.6" />
+  <text
+     x="110.54109"
+     y="301"
+     text-anchor="middle"
+     class="mono c-pg"
+     id="text12"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       style="fill:#626262;fill-opacity:1"
+       id="tspan43">PostgreSQL</tspan></text>
+  <text
+     x="110.54109"
+     y="315"
+     text-anchor="middle"
+     class="small dim"
+     id="text13">positions + outbox</text>
+  <text
+     x="311.54108"
+     y="315"
+     text-anchor="middle"
+     class="small dim"
+     id="text15" />
+  <rect
+     x="440.18036"
+     y="279.91296"
+     width="156.74327"
+     height="50.047825"
+     rx="2.72597"
+     class="node b-mg"
+     id="rect15"
+     style="stroke:#848484;stroke-width:0.82592;stroke-opacity:0.6" />
+  <text
+     x="514.54108"
+     y="301"
+     text-anchor="middle"
+     class="mono c-mg"
+     id="text16"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       style="fill:#787878;fill-opacity:1"
+       id="tspan39">MongoDB</tspan></text>
+  <text
+     x="514.54108"
+     y="315"
+     text-anchor="middle"
+     class="small dim"
+     id="text17">positions + outbox</text>
+  <!-- ══ Relay nodes ═══════════════════════════════════════════════════ -->
+  <rect
+     x="31.85849"
+     y="400.0285"
+     width="154.89694"
+     height="62.060959"
+     rx="2.6938601"
+     class="node b-py"
+     id="rect17"
+     style="stroke:#848484;stroke-width:0.821053;stroke-opacity:0.6" />
+  <text
+     x="110.54109"
+     y="421"
+     text-anchor="middle"
+     class="mono c-py"
+     id="text18"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       style="fill:#888888;fill-opacity:1"
+       id="tspan42">Outbox Relay</tspan></text>
+  <text
+     x="110.54109"
+     y="435"
+     text-anchor="middle"
+     class="small dim"
+     id="text19">polling</text>
+  <text
+     x="110.54109"
+     y="449"
+     text-anchor="middle"
+     class="small dim"
+     id="text20">at-least-once delivery</text>
+  <rect
+     x="440.18036"
+     y="400.02774"
+     width="156.74327"
+     height="62.059303"
+     rx="2.72597"
+     class="node b-ts"
+     id="rect20"
+     style="stroke:#848484;stroke-width:0.82592;stroke-opacity:0.6" />
+  <text
+     x="514.54108"
+     y="421"
+     text-anchor="middle"
+     class="mono c-ts"
+     id="text21"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       style="fill:#7c7c7c;fill-opacity:1"
+       id="tspan44">CDC Relay</tspan></text>
+  <text
+     x="514.54108"
+     y="435"
+     text-anchor="middle"
+     class="small dim"
+     id="text22">change stream</text>
+  <text
+     x="514.54108"
+     y="449"
+     text-anchor="middle"
+     class="small dim"
+     id="text23">at-least-once delivery</text>
+  <!-- ══ Edges ═════════════════════════════════════════════════════════ -->
+  <!-- REST PATCH: left screen left-edge → FastAPI (solid curve) -->
+  <path
+     d="M 216.54109,60 C 102.78982,56.982236 111.89775,53.890607 110.36316,158.76587"
+     class="e"
+     marker-end="url(#ah)"
+     id="path23"
+     sodipodi:nodetypes="cc"
+     style="stroke:#7cc144;stroke-opacity:0.741117" />
+  <text
+     x="164.92305"
+     y="55.554985"
+     text-anchor="middle"
+     class="e-label"
+     id="text24">REST PATCH</text>
+  <!-- WebSocket: FastAPI → left screen left-edge (dashed curve) -->
+  <path
+     d="m 147.87616,158.73948 c -2.45041,-46.24683 114.51257,-1.86475 110.78805,-48.09391"
+     class="e e-dash"
+     marker-end="url(#ah-d)"
+     id="path24"
+     sodipodi:nodetypes="cc"
+     style="stroke:#48c8c2;stroke-opacity:0.532995" />
+  <text
+     x="229.44594"
+     y="146.47218"
+     text-anchor="middle"
+     class="e-label"
+     id="text25">WebSocket</text>
+  <!-- REST PATCH: right screen right-edge → NestJS (solid curve) -->
+  <path
+     d="m 406.54109,60 c 112.45581,-0.986003 111.46292,1.210543 107.41206,99.38293"
+     class="e"
+     marker-end="url(#ah)"
+     id="path25"
+     sodipodi:nodetypes="cc"
+     style="stroke:#48c8c2;stroke-opacity:0.532995" />
+  <text
+     x="452.96698"
+     y="55.585995"
+     text-anchor="middle"
+     class="e-label"
+     id="text26">REST PATCH</text>
+  <!-- WebSocket: NestJS → right screen right-edge (dashed curve) -->
+  <path
+     d="m 473.26804,159.38216 c 0,-49.99846 -107.17572,-1.24969 -104.89313,-49.99637"
+     class="e e-dash"
+     marker-end="url(#ah-d)"
+     id="path26"
+     sodipodi:nodetypes="cc"
+     style="stroke:#7cc144;stroke-opacity:0.741117" />
+  <text
+     x="387.69019"
+     y="146.72777"
+     text-anchor="middle"
+     class="e-label"
+     id="text27">WebSocket</text>
+  <!-- atomic tx: FastAPI → PostgreSQL -->
+  <line
+     x1="110.54109"
+     y1="204"
+     x2="110.54109"
+     y2="280"
+     class="e"
+     marker-end="url(#ah)"
+     id="line27"
+     style="stroke:#7cc144;stroke-opacity:0.741117" />
+  <text
+     x="98.541092"
+     y="246"
+     text-anchor="end"
+     class="e-label"
+     id="text28">atomic tx</text>
+  <!-- atomic tx: NestJS → MongoDB -->
+  <line
+     x1="514.54108"
+     y1="204"
+     x2="514.54108"
+     y2="280"
+     class="e"
+     marker-end="url(#ah)"
+     id="line28"
+     style="stroke:#48c8c2;stroke-opacity:0.532995" />
+  <text
+     x="526.54108"
+     y="246"
+     text-anchor="start"
+     class="e-label"
+     id="text29">atomic tx</text>
+  <!-- pull: PostgreSQL → Outbox Relay -->
+  <line
+     x1="110.54109"
+     y1="330"
+     x2="110.54109"
+     y2="400"
+     class="e"
+     marker-end="url(#ah)"
+     id="line29"
+     style="stroke:#7cc144;stroke-opacity:0.741117" />
+  <text
+     x="106.83138"
+     y="388.50757"
+     text-anchor="end"
+     class="e-label"
+     id="text30">pull</text>
+  <!-- push: MongoDB → CDC Relay -->
+  <line
+     x1="514.54108"
+     y1="330"
+     x2="514.54108"
+     y2="400"
+     class="e"
+     marker-end="url(#ah)"
+     id="line30"
+     style="stroke:#48c8c2;stroke-opacity:0.532995" />
+  <text
+     x="518.51923"
+     y="344.55151"
+     text-anchor="start"
+     class="e-label"
+     id="text31">push</text>
+  <!-- pub: Outbox Relay → Redis -->
+  <text
+     x="209.71593"
+     y="431.11136"
+     text-anchor="middle"
+     class="e-label"
+     id="text32">pub</text>
+  <!-- pub: CDC Relay → Redis -->
+  <text
+     x="418.91986"
+     y="428.64307"
+     text-anchor="middle"
+     class="e-label"
+     id="text33">pub</text>
+  <!-- sub: Redis → FastAPI -->
+  <text
+     x="222.33299"
+     y="235.49011"
+     text-anchor="middle"
+     class="e-label"
+     id="text34">sub</text>
+  <!-- sub: Redis → NestJS -->
+  <text
+     x="390.25909"
+     y="237.34131"
+     text-anchor="middle"
+     class="e-label"
+     id="text35">sub</text>
+  <path
+     d="m 341.62143,278.44735 c -0.8154,-72.15735 133.88497,-2.48191 129.35145,-74.005"
+     class="e e-dash"
+     marker-end="url(#ah-d)"
+     id="path35"
+     sodipodi:nodetypes="cc"
+     style="stroke:#7cc144;stroke-dasharray:none;stroke-opacity:0.741117" />
+  <path
+     d="m 277.31004,278.42141 c 0.82645,-72.10682 -135.70109,-2.48017 -131.10608,-73.95316"
+     class="e e-dash"
+     marker-end="url(#ah-d)"
+     id="path36"
+     sodipodi:nodetypes="cc"
+     style="stroke:#48c8c2;stroke-dasharray:none;stroke-opacity:0.532995" />
+  <path
+     d="M 440.70991,438.26986 C 350.18158,438.92132 333.54309,400.61505 337.97634,329.08708"
+     class="e e-dash"
+     marker-end="url(#ah-d)"
+     id="path37"
+     sodipodi:nodetypes="cc"
+     style="stroke:#48c8c2;stroke-dasharray:none;stroke-opacity:0.532995" />
+  <path
+     d="m 187.1348,437.68176 c 83.46957,0.65183 97.74499,-37.67382 93.65741,-109.24112"
+     class="e e-dash"
+     marker-end="url(#ah-d)"
+     id="path38"
+     sodipodi:nodetypes="cc"
+     style="stroke:#7cc144;stroke-dasharray:none;stroke-opacity:0.741117" />
+  <rect
+     x="234.08046"
+     y="278.53003"
+     width="156.74327"
+     height="50.047825"
+     rx="2.72597"
+     class="node b-mg"
+     id="rect44"
+     style="stroke:#848484;stroke-width:0.82592;stroke-opacity:0.6" />
+  <text
+     x="312.76068"
+     y="307.17065"
+     text-anchor="middle"
+     class="mono c-mg"
+     id="text45"
+     style="stroke:#818181;stroke-opacity:0.6"><tspan
+       sodipodi:role="line"
+       id="tspan47"
+       x="312.76068"
+       y="307.17065"
+       style="fill:#787878;fill-opacity:1">Redis</tspan></text>
+</svg>

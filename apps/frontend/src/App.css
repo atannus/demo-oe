@@ -446,6 +446,8 @@ nav a.active {
 /* ── About Page ── */
 .about-page {
   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
   padding: 48px 64px 80px;
 }
 

@@ -54,13 +54,7 @@ pnpm --filter frontend lint    # eslint
 
 This is a polyglot monorepo (pnpm workspaces) demonstrating real-time synchronization across two independent backends that each own a separate database and replicate via Redis pub/sub.
 
-```
-Frontend (React/Vite :5173)
-  ├── REST PATCH + WebSocket ──► NestJS (:3001)  [MongoDB: positions + outbox]
-  └── REST PATCH + WebSocket ──► FastAPI (:8000) [PostgreSQL: positions + outbox]
-                                    │
-                          Redis (replication events via outbox relay)
-```
+![System Architecture](docs/diagrams/system-architecture.svg)
 
 **Separate storage per node:** NestJS uses MongoDB (`positions` collection); FastAPI uses PostgreSQL (`positions` table). Each backend only ever touches its own storage. `data_id` is an internal constant (`"1"`); it is not exposed as a URL parameter.
 

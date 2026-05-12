@@ -44,7 +44,7 @@ export function PositionBox({ badge, wsUrl, restUrl }: PositionBoxProps) {
         setTimeout(() => setRejected(false), 400)
       }
     } catch {
-      addEvent(`Write REJECTED by ${backendName} (CP mode)`, 'error')
+      addEvent(`${backendName} unreachable`, 'error')
     }
   }, [restUrl, addEvent, backendName])
 
@@ -84,19 +84,36 @@ export function PositionBox({ badge, wsUrl, restUrl }: PositionBoxProps) {
   }, [restUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const ws = new WebSocket(wsUrl)
-    ws.onmessage = (e) => {
-      const data = JSON.parse(e.data)
-      if (data.type === 'status') {
-        onStatusRef.current(data)
-        return
+    let ws: WebSocket
+    let retryTimer: ReturnType<typeof setTimeout>
+    let dead = false
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl)
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data)
+        if (data.type === 'status') {
+          onStatusRef.current(data)
+          return
+        }
+        if (dragging.current) return
+        const p = { x: data.x as number, y: data.y as number }
+        setPos(p)
+        addEvent(`Replication received by ${backendName}: ${fmt(p)}`, 'info')
       }
-      if (dragging.current) return
-      const p = { x: data.x as number, y: data.y as number }
-      setPos(p)
-      addEvent(`Replication received by ${backendName}: ${fmt(p)}`, 'info')
+      ws.onclose = () => {
+        if (dead) return
+        retryTimer = setTimeout(connect, 1500)
+      }
+      ws.onerror = () => ws.close()
     }
-    return () => ws.close()
+
+    connect()
+    return () => {
+      dead = true
+      clearTimeout(retryTimer)
+      ws?.close()
+    }
   }, [wsUrl, addEvent, backendName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const left = pos ? `${(pos.x + 1) / 2 * 100}%` : '50%'

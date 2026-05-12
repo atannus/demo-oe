@@ -4,13 +4,7 @@ A polyglot monorepo for CAP theorem experiments. Two independent backends (NestJ
 
 For the design rationale (why multi-leader, why separate databases, why the outbox pattern, why the partition model works the way it does), see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-```
-Frontend (React/Vite :5173)
-  ├── REST PATCH + WebSocket ──► NestJS (:3001)  [MongoDB: positions + outbox]
-  └── REST PATCH + WebSocket ──► FastAPI (:8000) [PostgreSQL: positions + outbox]
-                                    │
-                          Redis (replication events via outbox relay)
-```
+![System Architecture](docs/diagrams/system-architecture.svg)
 
 ## Prerequisites
 

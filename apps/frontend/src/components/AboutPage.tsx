@@ -4,12 +4,23 @@ export function AboutPage() {
       <div className="about-hero">
         <h1 className="about-title">An Interactive CAP Theorem Demo</h1>
         <p className="about-lead">
-          Two independent backends — NestJS (TypeScript) owns a MongoDB collection and FastAPI (Python)
-          owns a PostgreSQL table — replicate state through Redis pub/sub. You can trigger network partitions,
+          Two independent backends, NestJS (TypeScript) owning a MongoDB collection and FastAPI (Python)
+          owning a PostgreSQL table, replicate state through Redis pub/sub. You can trigger network partitions,
           watch the backends diverge or freeze depending on the consistency model, then heal the partition
           and observe reconciliation in real time.
         </p>
       </div>
+
+      <section className="about-section">
+        <h2 className="about-section-title">System Architecture</h2>
+        <p className="about-section-desc">
+          Two backends, each with their own database, connected by a Redis replication channel.
+          The outbox pattern guarantees at-least-once delivery even across process restarts.
+        </p>
+        <div className="about-diagram">
+          <img src="/diagrams/system-architecture.svg" alt="System architecture: Frontend, NestJS+MongoDB, FastAPI+PostgreSQL, Redis" />
+        </div>
+      </section>
 
       <section className="about-section">
         <h2 className="about-section-title">The CAP Triangle</h2>
@@ -64,6 +75,18 @@ export function AboutPage() {
         </p>
         <div className="about-diagram">
           <img src="/diagrams/sequence-write-normal.svg" alt="Sequence diagram for a normal write flow" />
+        </div>
+      </section>
+
+      <section className="about-section">
+        <h2 className="about-section-title">Outbox Write Flow</h2>
+        <p className="about-section-desc">
+          Every write atomically inserts a position record and an outbox record in the same transaction.
+          A relay process reads the outbox and publishes to Redis, deleting each entry only after
+          a successful publish, guaranteeing at-least-once delivery even if the process crashes mid-flight.
+        </p>
+        <div className="about-diagram">
+          <img src="/diagrams/outbox-write-flow.svg" alt="Outbox write flow: atomic DB write, relay publishes to Redis, deletes outbox entry on success" />
         </div>
       </section>
 

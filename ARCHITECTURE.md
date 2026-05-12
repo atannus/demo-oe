@@ -30,7 +30,7 @@ The system is designed as a **symmetric multi-leader** cluster:
 - Neither backend ever reads from or writes to the other's storage directly.
 - **Redis** carries **replication events** between the two nodes via a durable outbox relay. When a backend writes to its own storage, it also inserts an outbox record in the same atomic transaction; a separate relay process reads the outbox and publishes `{ source, x, y, updated_at }` to the `position:replicated` channel. The other backend's subscriber receives this event, applies the value to its own storage, and notifies its own WebSocket clients.
 
-The two backends use different databases intentionally: NestJS uses MongoDB and FastAPI uses PostgreSQL. This choice serves two purposes. First, it makes the boundary between nodes concrete and visible — each node's storage is structurally distinct, not just logically partitioned. Second, it allows the outbox relay strategies to differ across the two nodes, demonstrating the same pattern with different underlying mechanics (see below). The demo models two independent nodes that in a real deployment would live on separate servers, potentially in different geographies. Each container has its own process, network, and storage namespaces, which is the isolation that matters for demonstrating replication and CAP behavior. The only meaningful simplification is that both containers share a hardware failure domain: if the host goes down, both go down together. A real deployment would distribute them across independent infrastructure.
+The two backends use different databases intentionally: NestJS uses MongoDB and FastAPI uses PostgreSQL. This choice serves two purposes. First, it makes the boundary between nodes concrete and visible: each node's storage is structurally distinct, not just logically partitioned. Second, it allows the outbox relay strategies to differ across the two nodes, demonstrating the same pattern with different underlying mechanics (see below). The demo models two independent nodes that in a real deployment would live on separate servers, potentially in different geographies. Each container has its own process, network, and storage namespaces, which is the isolation that matters for demonstrating replication and CAP behavior. The only meaningful simplification is that both containers share a hardware failure domain: if the host goes down, both go down together. A real deployment would distribute them across independent infrastructure.
 
 This is a real-world pattern. Systems like Apache Cassandra, DynamoDB Global Tables, and CockroachDB use multi-leader (or "multi-master") replication: writes are accepted at any node and replicated asynchronously to peers. The CAP tradeoff appears naturally when replication fails.
 
@@ -64,7 +64,7 @@ Each backend now performs an **atomic write** on every position update:
 2. Insert an outbox record containing the same payload (`x`, `y`, `updated_at`) into an outbox table or collection **in the same database transaction**.
 3. Return success to the caller.
 
-A separate **relay process** runs independently of the write path. It reads outbox records and publishes them to Redis. Only after a confirmed publish does it delete the record. If the relay fails mid-cycle — because Redis is down, because the process crashes, or for any other reason — the record remains in the outbox and will be retried on the next cycle or on restart. This gives at-least-once delivery for the relay step.
+A separate **relay process** runs independently of the write path. It reads outbox records and publishes them to Redis. Only after a confirmed publish does it delete the record. If the relay fails mid-cycle (because Redis is down, because the process crashes, or for any other reason), the record remains in the outbox and will be retried on the next cycle or on restart. This gives at-least-once delivery for the relay step.
 
 Because the position write and the outbox insert are in the same transaction, they either both succeed or both fail. There is no window where the position is written but no outbox record exists to trigger replication.
 
@@ -72,11 +72,11 @@ Because the position write and the outbox insert are in the same transaction, th
 
 The two backends implement the outbox relay differently, demonstrating that the same guarantee can be achieved with different underlying mechanics:
 
-**FastAPI / PostgreSQL — polling relay**
+**FastAPI / PostgreSQL: polling relay**
 
 A background coroutine (`outbox_publisher`) wakes every 100 milliseconds, queries `outbox` for the oldest undelivered rows, publishes each to Redis, and deletes the row on confirmation. This is the simplest relay strategy: it requires no database-specific features, works identically on any relational database, and is straightforward to reason about. The tradeoff is a bounded delivery latency equal to the poll interval.
 
-**NestJS / MongoDB — change stream relay**
+**NestJS / MongoDB: change stream relay**
 
 A NestJS service (`OutboxRelayService`) opens a MongoDB **change stream** on the `outbox` collection filtered to insert operations. MongoDB delivers each new outbox document to the relay as it is inserted, rather than the relay polling for it. The relay publishes to Redis and deletes the document on confirmation. This is MongoDB's native CDC (change data capture) primitive: the database pushes events rather than the relay pulling them. Delivery latency is near-zero. The tradeoff is that it requires a MongoDB replica set (even a single-node one) and a persistent stream connection.
 
@@ -86,10 +86,10 @@ On startup, the relay performs a **catch-up scan** before opening the stream: it
 
 ### Outbox behavior during partitions
 
-When `partition_active` is true — either because the user triggered a simulated partition or because Redis went down and the auto-partition mode activated — the relay drops outbox records rather than buffering them. This is intentional:
+When `partition_active` is true (either because the user triggered a simulated partition or because Redis went down and the auto-partition mode activated), the relay drops outbox records rather than buffering them. This is intentional:
 
 - For **simulated partitions**, the divergence is deliberate. Buffering and auto-delivering writes made during the partition would short-circuit the Heal button flow, which is the educational centerpiece of the demo. Writes during a simulated AP partition are not retroactively replicated; the user resolves the divergence manually via the chosen heuristic.
-- For **infrastructure partitions** (Redis down), the behavior is the same: writes land on the local database and are not replicated after heal. The outbox's contribution in this case is narrower than in the process-crash scenario — it ensures that any outbox records that *were* written before the partition activated are not lost, but new records written during the partition are dropped once the relay clears them.
+- For **infrastructure partitions** (Redis down), the behavior is the same: writes land on the local database and are not replicated after heal. The outbox's contribution in this case is narrower than in the process-crash scenario: it ensures that any outbox records that *were* written before the partition activated are not lost, but new records written during the partition are dropped once the relay clears them.
 
 The outbox pattern's primary value here is for the failure scenario it was designed for: the window between a successful database write and a successful Redis publish when both systems are available. In that window, a process crash or transient Redis error no longer silently loses the replication event.
 
@@ -99,7 +99,7 @@ The system supports two modes of partition, selectable before the partition is t
 
 **Simulated partition** (application-layer): the frontend POSTs `{ active: true, mode: 'AP' | 'CP' }` to `/admin/partition` on both backends simultaneously. Each backend updates its in-process partition state. Redis is not touched; the simulation operates at the application layer.
 
-**Infrastructure partition** (real): the Redis service is stopped at the infrastructure level (`docker compose stop redis` or, in Kubernetes, scaling the Redis deployment to zero). Both backends detect the lost connection independently and enter the pre-configured mode automatically. When Redis is restored, both backends detect the reconnection and the frontend auto-heals using last-write-wins without requiring user intervention — mirroring how real AP systems reconcile after a network partition heals.
+**Infrastructure partition** (real): the Redis service is stopped at the infrastructure level (`docker compose stop redis` or, in Kubernetes, scaling the Redis deployment to zero). Both backends detect the lost connection independently and enter the pre-configured mode automatically. When Redis is restored, both backends detect the reconnection and the frontend auto-heals using last-write-wins without requiring user intervention, mirroring how real AP systems reconcile after a network partition heals.
 
 In both modes, when a partition is active each backend:
 - **Suppresses outgoing replication**: does not publish to Redis after a write
@@ -117,7 +117,7 @@ Both backends reject writes with HTTP 503. No new data is written to either tabl
 
 ### Why both backends participate in the partition simultaneously
 
-In a real network partition, *all* nodes are affected: a partition splits the cluster, it does not selectively affect one node. Activating the partition on one backend only would produce asymmetric behavior that does not reflect reality. The frontend sends the activation to both backends in parallel so both enter the partitioned state together. In the infrastructure partition mode, symmetry emerges from the infrastructure rather than coordination: when Redis goes down, both backends independently lose connectivity to it. Detection timing differs — NestJS reacts within milliseconds via connection error events; FastAPI's async subscriber takes a few seconds longer — but the frontend enters partition mode as soon as either node detects the loss, because replication is severed the moment the first node can no longer reach Redis.
+In a real network partition, *all* nodes are affected: a partition splits the cluster, it does not selectively affect one node. Activating the partition on one backend only would produce asymmetric behavior that does not reflect reality. The frontend sends the activation to both backends in parallel so both enter the partitioned state together. In the infrastructure partition mode, symmetry emerges from the infrastructure rather than coordination: when Redis goes down, both backends independently lose connectivity to it. Detection timing differs (NestJS reacts within milliseconds via connection error events; FastAPI's async subscriber takes a few seconds longer), but the frontend enters partition mode as soon as either node detects the loss, because replication is severed the moment the first node can no longer reach Redis.
 
 ## Healing and reconciliation
 

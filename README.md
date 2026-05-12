@@ -4,6 +4,8 @@ A polyglot monorepo for CAP theorem experiments. Two independent backends (NestJ
 
 For the design rationale (why multi-leader, why separate databases, why the outbox pattern, why the partition model works the way it does), see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
+The diagram below shows the overall system topology:
+
 ![System Architecture](docs/diagrams/system-architecture.svg)
 
 ## Prerequisites
@@ -36,7 +38,7 @@ pnpm dev
 minikube start
 make build    # builds all three images into minikube's docker daemon
 make deploy   # applies all k8s manifests
-minikube tunnel  # separate terminal — maps LoadBalancer IPs to localhost
+minikube tunnel  # separate terminal: maps LoadBalancer IPs to localhost
 ```
 
 | Service         | URL                   |

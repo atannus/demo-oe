@@ -1,4 +1,4 @@
-.PHONY: build deploy teardown dev observe observe-teardown
+.PHONY: build deploy restart teardown dev observe observe-teardown
 
 HELM_MONITORING_NS := monitoring
 
@@ -7,6 +7,9 @@ build: ## Build all three app images into minikube's docker daemon
 	docker build -t edu-oe/backend-ts:latest -f apps/backend-ts/Dockerfile . && \
 	docker build -t edu-oe/backend-py:latest apps/backend-py && \
 	docker build -t edu-oe/frontend:latest -f apps/frontend/Dockerfile .
+
+restart: ## Force rollout restart of all app deployments (use after make build)
+	kubectl rollout restart deployment/backend-ts deployment/backend-py deployment/frontend -n edu-oe
 
 deploy: ## Apply all k8s manifests
 	kubectl apply -f k8s/namespace.yaml

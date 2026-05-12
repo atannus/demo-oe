@@ -126,17 +126,17 @@ export function PartitionProvider({ children }: { children: ReactNode }) {
   const onTsStatus = useCallback((status: BackendStatus) => setTsStatus(status), [])
   const onPyStatus = useCallback((status: BackendStatus) => setPyStatus(status), [])
 
-  // Detect partitions triggered automatically by Redis going down
+  // Sync capMode from backend state on connect/reconnect
   useEffect(() => {
     if (!tsStatus || !pyStatus) return
     if (capMode !== 'normal') return
-    const tsAuto = tsStatus.partition.active && tsStatus.partition.source === 'auto'
-    const pyAuto = pyStatus.partition.active && pyStatus.partition.source === 'auto'
-    if (tsAuto || pyAuto) {
-      const mode = (tsAuto ? tsStatus : pyStatus).partition.mode
-      setCapMode(mode)
-      setPartitionSource('auto')
-      addEvent(`Partition detected. Redis down, ${mode} mode active.`, 'warn')
+    const active = tsStatus.partition.active || pyStatus.partition.active
+    if (active) {
+      const status = tsStatus.partition.active ? tsStatus : pyStatus
+      setCapMode(status.partition.mode)
+      setPartitionSource(status.partition.source)
+      const reason = status.partition.source === 'auto' ? 'Redis down' : 'backend state'
+      addEvent(`Partition detected (${reason}). ${status.partition.mode} mode active.`, 'warn')
     }
   }, [tsStatus, pyStatus, capMode, addEvent])
 
